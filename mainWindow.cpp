@@ -1,7 +1,19 @@
 #include "mainWindow.h"
+#include <iostream>
 #include <fstream>
 
 mainWindow::mainWindow(){
+  this->set_title("nix8 The GTK chip interpreter");
+  this->box = new Gtk::Box(Gtk::ORIENTATION_VERTICAL);
+  this->add(*box);
+  this->setup_menu();
+  this->cpu = NULL;
+  this->scrn = new screen();
+  this->box->pack_start(*scrn, Gtk::PACK_EXPAND_WIDGET);
+  this->box->show_all();
+  this->add_events(Gdk::KEY_PRESS_MASK);
+  this->show_all_children();
+  /*
   std::ifstream is ("game", std::ifstream::binary);
   is.seekg (0, is.end);
   int length = is.tellg();
@@ -12,18 +24,101 @@ mainWindow::mainWindow(){
   this->mem = new memory();
   this->mem->set(0x200, (byte*)buffer, length);
   this->cpu = new CPU(mem);
-  this->scrn = new screen(cpu);
 
   this->add(*scrn);
 
-  this->add_events(Gdk::KEY_PRESS_MASK);
   this->show_all_children();
   free(buffer);
-  is.close();
+  is.close();*/
+}
+
+void mainWindow::setup_menu(){
+  this->menu_ActionGroup = Gtk::ActionGroup::create();
+  this->menu_ActionGroup->add(Gtk::Action::create("FileOpen",
+                                                  Gtk::Stock::OPEN, "Open", "Open CHIP8 program"),
+                              sigc::mem_fun(*this, &mainWindow::action_open_program));
+  this->menu_ActionGroup->add(Gtk::Action::create("FileReset",
+                                                  Gtk::Stock::REFRESH, "Reset", "Reset program"),
+                              sigc::mem_fun(*this, &mainWindow::action_reset));
+  this->menu_ActionGroup->add(Gtk::Action::create("FileQuit",
+                                                  Gtk::Stock::QUIT, "Quit", "Quit"),
+                              sigc::mem_fun(*this, &mainWindow::action_quit));
+  this->menu_UIManager = Gtk::UIManager::create();
+  this->menu_UIManager->insert_action_group(this->menu_ActionGroup);
+  this->add_accel_group(this->menu_UIManager->get_accel_group());
+
+  this->menu_ActionGroup->add(Gtk::Action::create("FileMenu", "File"));
+
+
+  Glib::ustring ui_info =
+    "<ui>"
+    "  <menubar name='MenuBar'>"
+    "    <menu action='FileMenu'>"
+    "      <menuitem action='FileOpen'/>"
+    "      <menuitem action='FileReset'/>"
+    "      <separator/>"
+    "      <menuitem action='FileQuit'/>"
+    "    </menu>"
+    "  </menubar>"
+    "</ui>";
+
+  try
+  {
+    this->menu_UIManager->add_ui_from_string(ui_info);
+  }
+  catch(const Glib::Error& ex)
+  {
+    std::cerr << "building menus failed: " <<  ex.what();
+  }
+  Gtk::Widget *menubar = this->menu_UIManager->get_widget("/MenuBar");
+  this->box->pack_start(*menubar, Gtk::PACK_SHRINK);
 }
 
 mainWindow::~mainWindow(){
   delete this->cpu;
+}
+
+void mainWindow::action_open_program(){
+  Gtk::FileChooserDialog dialog("Please choose a CHIP8 program",
+                                Gtk::FILE_CHOOSER_ACTION_OPEN);
+  dialog.set_transient_for(*this);
+  dialog.add_button(Gtk::Stock::CANCEL, Gtk::RESPONSE_CANCEL);
+  dialog.add_button(Gtk::Stock::OPEN, Gtk::RESPONSE_OK);
+
+  int result = dialog.run();
+
+  if(result == Gtk::RESPONSE_OK){
+    this->program_path = dialog.get_filename();
+    this->action_reset();
+  }
+}
+
+void mainWindow::action_reset(){
+  if(this->cpu)
+    delete this->cpu;
+  if(this->program_path.empty())
+    return;
+
+  std::ifstream is(this->program_path.c_str(), std::ifstream::binary);
+  is.seekg (0, is.end);
+  int length = is.tellg();
+  is.seekg (0, is.beg);
+  if(length > 4095-0x200)
+    return;
+
+  char *buffer = (char*)malloc(sizeof(byte)*length);
+  is.read(buffer, length);
+
+  this->mem = new memory();
+  this->mem->set(0x200, (byte*)buffer, length);
+  free(buffer);
+  this->cpu = new CPU(mem);
+  this->scrn->setVideoSource(this->cpu);
+  this->scrn->start();
+}
+
+void mainWindow::action_quit(){
+  this->hide();
 }
 
 bool mainWindow::on_key_press_event(GdkEventKey *event){

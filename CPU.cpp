@@ -132,9 +132,6 @@ void CPU::loadSprite(byte *sprite, std::size_t size, byte x, byte y){
     }
 
     byte oldRow[8] = {0}; // (byte*)malloc(sizeof(byte)*8);
-    if(!oldRow){
-      g_warning("could not allocate memory in loadSprite");
-    }
     for(int i = 0; i < 8; i++){
       memcpy(oldRow, this->videoBuffer[(spriteByte+y)%32], 8);
       this->videoBuffer[(spriteByte+y)%32][i] ^= row[i];

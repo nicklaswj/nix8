@@ -2,23 +2,45 @@
 #include <cairomm/context.h>
 
 screen::screen(screenSource *sSrc){
-  this->screenSrc = sSrc;
+  this->setVideoSource(sSrc);
+  this->init();
+  this->start();
+}
+
+screen::screen(){
+  this->init();
+}
+
+void screen::init(){
   this->t = (struct timespec*)malloc(sizeof(struct timespec));
   this->t->tv_sec = 0;
   //about 35 Hz
   this->t->tv_nsec = 28571428;
-
-  this->stop = false;
-  this->refreshThread = Glib::Thread::create(sigc::mem_fun(*this, &screen::run));
+  this->stoped = true;
 }
 
 screen::~screen(){
-  this->stop = true;
+  this->stop();
+}
+
+void screen::stop(){
+  this->stoped = true;
   this->refreshThread->join();
 }
 
+void screen::start(){
+  if(!this->screenSrc)
+    return;
+  this->stoped = false;
+  this->refreshThread = Glib::Thread::create(sigc::mem_fun(*this, &screen::run));
+}
+
+void screen::setVideoSource(screenSource *src){
+  this->screenSrc = src;
+}
+
 void screen::run(){
-  while(!this->stop){
+  while(!this->stoped){
     this->force_redraw();
 
     nanosleep(this->t, NULL);
@@ -37,6 +59,8 @@ void screen::force_redraw(){
 }
 
 bool screen::on_draw(const Cairo::RefPtr<Cairo::Context>& cr){
+  if(this->stoped)
+    return true;
   unsigned char **scrnBuffer = this->screenSrc->getVideoBuffer();
   Gtk::Allocation allocation = this->get_allocation();
   const double height = allocation.get_height();
