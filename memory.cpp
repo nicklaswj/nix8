@@ -1,6 +1,7 @@
 #include "memory.h"
 #include <cstdlib>
 #include <cstring>
+#include <gtkmm.h>
 
 memory::memory(){
   this->mem = (byte*)calloc(4095, sizeof(byte));

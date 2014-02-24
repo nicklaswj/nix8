@@ -11,7 +11,8 @@ class mainWindow : public Gtk::Window {
 
  private:
   CPU *cpu;
-  memory mem;
-  screen scrn;
-  bool on_key_press_event(GdkEventKey *event)
+  memory *mem;
+  screen *scrn;
+  bool on_key_press_event(GdkEventKey *event);
+  bool on_key_release_event(GdkEventKey *event);
 };

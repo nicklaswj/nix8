@@ -1,6 +1,6 @@
 CC=g++
 
-CFLAGS=-c -Wall `pkg-config gtkmm-3.0 --cflags`
+CFLAGS=-v -c -Wall -ggdb `pkg-config gtkmm-3.0 --cflags`
 
 nix8: CPU.o screen.o memory.o main.o mainWindow.o
 	$(CC) -o nix8 `pkg-config gtkmm-3.0 --libs` main.o screen.o mainWindow.o CPU.o memory.o

@@ -2,6 +2,7 @@
 #include <cstddef>
 #include "screenSource.h"
 #include <ctime>
+#include <gtkmm.h>
 
 typedef unsigned short int instr;
 
@@ -26,12 +27,20 @@ class CPU : public screenSource {
   byte **videoBuffer;
   bool *keyInput;
   void loadPreSprites();
+  void init();
   struct timespec *clockTimer;
+  Glib::Thread *runThread;
+  Glib::Thread *TimerClockThread;
+  bool stop;
+  void timerDecreementer();
+  void timer60Hz();
+
+ protected:
+  Glib::Dispatcher emiter60Hz;
 
  public:
   bool getFlag();
   void loadSprite(byte*, std::size_t, byte, byte);
-  void loadSprite(byte*, std::size_t, byte, byte, bool);
   void setKeyInput(byte, bool);
   instr readInstruction();
   void run();

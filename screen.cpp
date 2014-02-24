@@ -3,10 +3,37 @@
 
 screen::screen(screenSource *sSrc){
   this->screenSrc = sSrc;
+  this->t = (struct timespec*)malloc(sizeof(struct timespec));
+  this->t->tv_sec = 0;
+  //about 35 Hz
+  this->t->tv_nsec = 28571428;
+
+  this->stop = false;
+  this->refreshThread = Glib::Thread::create(sigc::mem_fun(*this, &screen::run));
 }
 
 screen::~screen(){
+  this->stop = true;
+  this->refreshThread->join();
+}
 
+void screen::run(){
+  while(!this->stop){
+    this->force_redraw();
+
+    nanosleep(this->t, NULL);
+  }
+}
+
+void screen::force_redraw(){
+  //force our program to redraw the entire clock.
+  Glib::RefPtr<Gdk::Window> win = this->get_window();
+  Gtk::Allocation all = get_allocation();
+  if(win)
+    {
+      Gdk::Rectangle r(0, 0, all.get_width(), all.get_height());
+      win->invalidate_rect(r, false);
+    }
 }
 
 bool screen::on_draw(const Cairo::RefPtr<Cairo::Context>& cr){
@@ -44,6 +71,9 @@ bool screen::on_draw(const Cairo::RefPtr<Cairo::Context>& cr){
     }
   }
   cr->fill();
-
+  for(int i = 0; i < 32; i++){
+    free(scrnBuffer[i]);
+  }
+  free(scrnBuffer);
   return true;
 }

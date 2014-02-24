@@ -12,7 +12,7 @@ CPU::CPU(memory *mm){
   this->stack = (address*)calloc(16, sizeof(address));
   this->stackPointer = 0;
   this->mem = mm;
-  this->PC = 0;
+  this->PC = 0x200;
   this->delay = 0;
   this->sound = 0;
   this->keyInput = (bool*)calloc(0x10, sizeof(bool));
@@ -26,6 +26,47 @@ CPU::CPU(memory *mm){
     this->videoBuffer[i] = (byte*)calloc(sizeof(byte), 8);
   }
   this->loadPreSprites();
+  this->stop = false;
+  this->runThread = Glib::Thread::create(sigc::mem_fun(*this, &CPU::init));
+}
+
+CPU::~CPU(){
+  this->stop = true;
+  this->runThread->join();
+
+  free(this->V);
+  free(this->stack);
+  for(int i = 0; i < 32; i++)
+    free(this->videoBuffer[i]);
+  free(this->videoBuffer);
+  delete this->mem;
+  free(this->keyInput);
+  free(this->clockTimer);
+}
+
+
+void CPU::timer60Hz(){
+  while(!this->stop){
+    emiter60Hz();
+    struct timespec t;
+    t.tv_sec = 0;
+    t.tv_nsec = 16666667;
+    nanosleep(&t, NULL);
+  }
+}
+
+void CPU::timerDecreementer(){
+  if(this->delay > 0)
+    this->delay--;
+  if(this->sound > 0)
+    this->sound--;
+}
+
+void CPU::init(){
+  this->emiter60Hz.connect(sigc::mem_fun(*this, &CPU::timerDecreementer));
+  this->TimerClockThread = Glib::Thread::create(sigc::mem_fun(*this, &CPU::timer60Hz));
+
+  this->run();
 }
 
 void CPU::loadPreSprites(){
@@ -90,7 +131,10 @@ void CPU::loadSprite(byte *sprite, std::size_t size, byte x, byte y){
         row[bytePlace] |= (0x80>>bitPlace);
     }
 
-    byte *oldRow = (byte*)malloc(sizeof(byte)*8);
+    byte oldRow[8] = {0}; // (byte*)malloc(sizeof(byte)*8);
+    if(!oldRow){
+      g_warning("could not allocate memory in loadSprite");
+    }
     for(int i = 0; i < 8; i++){
       memcpy(oldRow, this->videoBuffer[(spriteByte+y)%32], 8);
       this->videoBuffer[(spriteByte+y)%32][i] ^= row[i];
@@ -107,18 +151,13 @@ void CPU::loadSprite(byte *sprite, std::size_t size, byte x, byte y){
   }
 }
 
-CPU::~CPU(){
-  free(this->V);
-  free(this->stack);
-  for(int i = 0; i < 32; i++)
-    free(this->videoBuffer[i]);
-  free(this->videoBuffer);
-  delete this->mem;
-}
-
 void CPU::run(){
-  this->execute();
-  nanosleep(this->clockTimer, NULL);
+  while(!this->stop){
+    this->execute();
+    nanosleep(this->clockTimer, NULL);
+    if(this->stop)
+      return;
+  }
 }
 
 void CPU::setKeyInput(byte key, bool pressed){
@@ -127,7 +166,7 @@ void CPU::setKeyInput(byte key, bool pressed){
 
 instr CPU::readInstruction(){
   byte first = this->mem->get(this->PC);
-  byte second = this->mem->get(this->PC);
+  byte second = this->mem->get(this->PC+1);
   return (instr)((first<<8)+second);
 }
 
@@ -166,10 +205,10 @@ void CPU::clearFlag(){
 void CPU::execute(){
   int clock = stdClock;
   instr instruction = this->readInstruction();
-  byte opCode1 = (byte)(instruction & 0xF000) >> 12;
-  byte opCode2 = (byte)(instruction & 0x0F00) >> 8;
-  byte opCode3 = (byte)(instruction & 0x00F0) >> 4;
-  byte opCode4 = (byte)(instruction & 0x000F) >> 0;
+  byte opCode1 = (byte)((instruction & 0xF000) >> 12);
+  byte opCode2 = (byte)((instruction & 0x0F00) >> 8);
+  byte opCode3 = (byte)((instruction & 0x00F0) >> 4);
+  byte opCode4 = (byte)((instruction & 0x000F) >> 0);
 
   instr nnn = (instruction & 0x0FFF);
   byte n = (instruction & 0x000F) >> 0;
@@ -180,13 +219,14 @@ void CPU::execute(){
   switch(opCode1){
   case 0x0:
     //opCode 0???
-    if(opCode3 == 0x0 && opCode2 == 0xE){
+    if(opCode2 == 0x0 && opCode3 == 0xE){
       //opCode 00E?
-      if(opCode1 == 0x0){
+      if(opCode4 == 0x0){
         //opCode 00E0
         //clear screen
-        memset(this->videoBuffer, 0, 64*32);
-      }else if(opCode1 == 0xE){
+        for(int i = 0; i < 32; i++)
+          memset(this->videoBuffer[i], 0, 8);
+      }else if(opCode4 == 0xE){
         //opCode 00EE
         //return from subroutine
         this->setPC(this->popStack());
@@ -347,12 +387,12 @@ void CPU::execute(){
     break;
   case 0xE:
     //opCode Ex??
-    if(opCode2 == 0x9 && opCode1 == 0xE){
+    if(opCode3 == 0x9 && opCode4 == 0xE){
       //opCode Dx9E
       //skip next instruction if key with the value of Vx is pressed
       if(this->keyInput[this->getV(x)])
         clock = skipInstr;
-    }else if(opCode2 == 0xA && opCode1 == 1){
+    }else if(opCode3 == 0xA && opCode4 == 1){
       //opCode DxA1
       //skip next instruction if key with the value of Vx is not pressed
       if(!this->keyInput[this->getV(x)])
@@ -361,14 +401,14 @@ void CPU::execute(){
     break;
   case 0xF:
     //opCode Fx??
-    switch(opCode2){
+    switch(opCode3){
     case 0x0:
       //opCode Fx0?
-      if(opCode1 == 0x7){
+      if(opCode4 == 0x7){
         //opCode Fx07
         //set Vx = delay timer value
         this->setV(x, this->delay);
-      }else if(opCode1 == 0xA){
+      }else if(opCode4 == 0xA){
         //opCode Fx0A
         //wait for a key press, store the value of the key in Vx
         struct timespec t;
@@ -392,7 +432,7 @@ void CPU::execute(){
       break;
     case 0x1:
       //opCode Fx1?
-      switch(opCode1){
+      switch(opCode4){
       case 0x5:
         //opCode Fx15
         //set delay timer = Vx
