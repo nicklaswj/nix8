@@ -32,6 +32,7 @@ CPU::CPU(memory *mm){
 
 CPU::~CPU(){
   this->stop = true;
+  this->TimerClockThread->join();
   this->runThread->join();
 
   free(this->V);
