@@ -13,23 +13,6 @@ mainWindow::mainWindow(){
   this->box->show_all();
   this->add_events(Gdk::KEY_PRESS_MASK);
   this->show_all_children();
-  /*
-  std::ifstream is ("game", std::ifstream::binary);
-  is.seekg (0, is.end);
-  int length = is.tellg();
-  is.seekg (0, is.beg);
-  char *buffer = (char*)malloc(sizeof(byte)*length);
-  is.read(buffer, length);
-
-  this->mem = new memory();
-  this->mem->set(0x200, (byte*)buffer, length);
-  this->cpu = new CPU(mem);
-
-  this->add(*scrn);
-
-  this->show_all_children();
-  free(buffer);
-  is.close();*/
 }
 
 void mainWindow::setup_menu(){
