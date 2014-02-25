@@ -13,6 +13,27 @@ mainWindow::mainWindow(){
   this->box->show_all();
   this->add_events(Gdk::KEY_PRESS_MASK);
   this->show_all_children();
+  this->about_dialog = new Gtk::AboutDialog();
+  this->about_dialog->set_transient_for(*this);
+  this->about_dialog->set_program_name("nix8");
+  this->about_dialog->set_version("1.0");
+  this->about_dialog->set_comments("nix8 the CHIP8 interpreter for linux");
+  this->about_dialog->set_copyright("MIT License");
+  this->about_dialog->set_website("https://github.com/nicklaswj/nix8");
+
+  std::vector<Glib::ustring> authors;
+  authors.push_back("Nicklas Warming Jacobsen");
+  this->about_dialog->set_authors(authors);
+  this->about_dialog->signal_response().connect(sigc::mem_fun(*this, &mainWindow::about_dialog_response));
+}
+
+void mainWindow::about_dialog_response(int response_id){
+  this->about_dialog->hide();
+}
+
+void mainWindow::show_about(){
+  this->about_dialog->show();
+  this->about_dialog->present();
 }
 
 void mainWindow::setup_menu(){
@@ -26,11 +47,15 @@ void mainWindow::setup_menu(){
   this->menu_ActionGroup->add(Gtk::Action::create("FileQuit",
                                                   Gtk::Stock::QUIT, "Quit", "Quit"),
                               sigc::mem_fun(*this, &mainWindow::action_quit));
+  this->menu_ActionGroup->add(Gtk::Action::create("HelpAbout",
+                                                  Gtk::Stock::ABOUT, "About", "About this program"),
+                              sigc::mem_fun(*this, &mainWindow::show_about));
   this->menu_UIManager = Gtk::UIManager::create();
   this->menu_UIManager->insert_action_group(this->menu_ActionGroup);
   this->add_accel_group(this->menu_UIManager->get_accel_group());
 
   this->menu_ActionGroup->add(Gtk::Action::create("FileMenu", "File"));
+  this->menu_ActionGroup->add(Gtk::Action::create("HelpMenu", "Help"));
 
 
   Glib::ustring ui_info =
@@ -41,6 +66,9 @@ void mainWindow::setup_menu(){
     "      <menuitem action='FileReset'/>"
     "      <separator/>"
     "      <menuitem action='FileQuit'/>"
+    "    </menu>"
+    "    <menu action='HelpMenu'>"
+    "      <menuitem action='HelpAbout'/>"
     "    </menu>"
     "  </menubar>"
     "</ui>";

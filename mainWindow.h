@@ -12,6 +12,7 @@ class mainWindow : public Gtk::Window {
   void action_reset();
   void action_quit();
   void action_open_program();
+  void about_dialog_response(int);
  private:
   Gtk::Box *box;
   CPU *cpu;
@@ -23,4 +24,6 @@ class mainWindow : public Gtk::Window {
   Glib::RefPtr<Gtk::ActionGroup> menu_ActionGroup;
   void setup_menu();
   std::string program_path;
+  void show_about();
+  Gtk::AboutDialog *about_dialog;
 };
