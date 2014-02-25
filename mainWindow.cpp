@@ -82,6 +82,8 @@ void mainWindow::action_reset(){
   if(this->program_path.empty())
     return;
 
+  this->scrn->stop();
+
   std::ifstream is(this->program_path.c_str(), std::ifstream::binary);
   is.seekg (0, is.end);
   int length = is.tellg();
